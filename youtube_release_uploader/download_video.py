@@ -16,8 +16,7 @@ MAX_AGE_HOURS = 36
 MIN_BYTES = 1_000_000
 WORK = Path("work")
 WORK.mkdir(exist_ok=True)
-COOKIES_FILE = WORK / "cookies.txt"
-YT_DLP = ["yt-dlp", "--cookies", str(COOKIES_FILE)]
+YT_DLP = ["yt-dlp", "--extractor-args", "youtube:player-client=mweb,web_safari"]
 
 
 def run(args, *, capture=False, check=True):
