@@ -67,6 +67,53 @@ jobs:
           echo "::error::PO token provider did not start."
           exit 1
 
+      - name: Prepare YouTube cookies
+        env:
+          YOUTUBE_COOKIES_B64: ${{ secrets.YOUTUBE_COOKIES_B64 }}
+        run: |
+          python - <<'PY'
+          import base64
+          import os
+          from pathlib import Path
+
+          encoded = os.environ.get("YOUTUBE_COOKIES_B64", "").strip()
+          if not encoded:
+              raise SystemExit("YOUTUBE_COOKIES_B64 secret is missing or empty.")
+
+          try:
+              data = base64.b64decode(encoded, validate=True)
+              content = data.decode("utf-8")
+          except Exception as exc:
+              raise SystemExit(f"YOUTUBE_COOKIES_B64 is not valid Base64 UTF-8: {exc}")
+
+          lines = content.splitlines()
+          if not lines or not any(line.startswith("# Netscape HTTP Cookie File") or
+                                  line.startswith("# HTTP Cookie File") for line in lines[:5]):
+              raise SystemExit("Cookie file is not in the expected Netscape cookies.txt format.")
+
+          youtube_cookie_found = False
+          for line in lines:
+              if not line or line.startswith("#") and not line.startswith("#HttpOnly_"):
+                  continue
+              fields = line.split("\\t")
+              if len(fields) >= 7:
+                  domain = fields[0].removeprefix("#HttpOnly_").lstrip(".").lower()
+                  if domain == "youtube.com" or domain.endswith(".youtube.com"):
+                      youtube_cookie_found = True
+                      break
+
+          if not youtube_cookie_found:
+              raise SystemExit("Cookie file contains no youtube.com cookie entries.")
+
+          target = Path("work/youtube-cookies.txt")
+          target.parent.mkdir(parents=True, exist_ok=True)
+          target.write_bytes(data)
+          target.chmod(0o600)
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as env_file:
+              env_file.write(f"YOUTUBE_COOKIES_FILE={target.resolve()}\\n")
+          print("YouTube cookies decoded and validated; contents are not displayed.")
+          PY
+
       - name: Check Python syntax
         run: python -m py_compile youtube_release_uploader/download_video.py
 
