@@ -1,0 +1,52 @@
+name: BhagvadGita Video Downloader
+
+on:
+  schedule:
+    - cron: "30 0 * * *" # 06:00 Asia/Kolkata
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Download and validate only; do not touch Release assets"
+        required: true
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bhagvadgita-video-downloader
+  cancel-in-progress: false
+
+jobs:
+  download-and-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+      GITHUB_REPOSITORY: ${{ github.repository }}
+      YOUTUBE_CHANNEL_ID: UC2sBCYCH6Kb9dgqQN3vVgFw
+      RELEASE_TAG: Friday
+      DRY_RUN: ${{ github.event_name == 'schedule' && 'false' || inputs.dry_run }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install yt-dlp
+        run: python -m pip install --upgrade yt-dlp
+
+      - name: Check Python syntax
+        run: python -m py_compile youtube_release_uploader/download_video.py
+
+      - name: Download, validate and optionally publish
+        run: python youtube_release_uploader/download_video.py
