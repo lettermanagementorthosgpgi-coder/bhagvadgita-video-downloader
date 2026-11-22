@@ -110,7 +110,7 @@ jobs:
           target.write_bytes(data)
           target.chmod(0o600)
           with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as env_file:
-              env_file.write(f"YOUTUBE_COOKIES_FILE={target.resolve()}\\n")
+              env_file.write(f"YOUTUBE_COOKIES_FILE={target.resolve()}\n")
           print("YouTube cookies decoded and validated; contents are not displayed.")
           PY
 
