@@ -18,7 +18,13 @@ WORK = Path("work")
 WORK.mkdir(exist_ok=True)
 COOKIES_FILE = os.getenv("YOUTUBE_COOKIES_FILE")
 # Let yt-dlp and the installed PO-token provider negotiate supported YouTube clients.
-YT_DLP = ["yt-dlp", "--js-runtimes", "deno"]
+# Prefer clients supported by the installed PO-token provider. The mweb
+# client is the current yt-dlp recommendation for GVS PO-token requests;
+# tv and web_safari remain fallbacks if YouTube rejects that client.
+YT_DLP = [
+    "yt-dlp", "--js-runtimes", "deno",
+    "--extractor-args", "youtube:player-client=mweb,tv,web_safari",
+]
 if COOKIES_FILE:
     if not Path(COOKIES_FILE).is_file():
         raise RuntimeError("Configured YouTube cookies file is missing.")
@@ -246,7 +252,9 @@ def main():
     )
     video_url = f"https://www.youtube.com/watch?v={video_id}"
     print("Checking formats available for the selected livestream:", flush=True)
-    run(YT_DLP + ["--no-playlist", "--list-formats", video_url])
+    # Verbose mode records whether bgutil providers were loaded and whether
+    # a PO token was actually requested/generated for the selected client.
+    run(YT_DLP + ["--verbose", "--no-playlist", "--list-formats", video_url])
     run(YT_DLP + ["--no-playlist", "--format", format_selector,
          "--merge-output-format", "mp4", "--output", str(output),
          video_url])
