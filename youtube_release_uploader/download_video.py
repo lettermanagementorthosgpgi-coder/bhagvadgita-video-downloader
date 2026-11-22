@@ -17,7 +17,8 @@ MIN_BYTES = 1_000_000
 WORK = Path("work")
 WORK.mkdir(exist_ok=True)
 COOKIES_FILE = os.getenv("YOUTUBE_COOKIES_FILE")
-YT_DLP = ["yt-dlp", "--extractor-args", "youtube:player_client=mweb,web_safari"]
+# Let yt-dlp and the installed PO-token provider negotiate supported YouTube clients.
+YT_DLP = ["yt-dlp"]
 if COOKIES_FILE:
     if not Path(COOKIES_FILE).is_file():
         raise RuntimeError("Configured YouTube cookies file is missing.")
@@ -145,7 +146,7 @@ def get_candidate():
             continue
 
         url = f"https://www.youtube.com/watch?v={video_id}"
-        info = run(YT_DLP + ["--skip-download", "--dump-single-json", url],
+        info = run(YT_DLP + ["--ignore-no-formats-error", "--skip-download", "--dump-single-json", url],
                    capture=True, check=False)
         if info.returncode != 0 or not info.stdout.strip():
             detail = (info.stderr or "").strip().splitlines()
