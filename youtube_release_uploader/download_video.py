@@ -128,17 +128,35 @@ def get_candidate():
             print(f"Skipping BhagvadGita entry without a video ID: {title!r}", flush=True)
             continue
 
+        # The /streams tab also contains upcoming scheduled broadcasts.
+        # Do not even request their watch-page metadata: only actual live
+        # broadcasts and completed livestream replays are eligible.
+        listing_status = item.get("live_status")
+        if listing_status not in ("is_live", "was_live"):
+            print(f"Skipping non-live/scheduled entry {video_id} "
+                  f"(live_status={listing_status!r}); only actual livestreams are checked.",
+                  flush=True)
+            continue
+
         url = f"https://www.youtube.com/watch?v={video_id}"
         info = run(["yt-dlp", "--skip-download", "--dump-single-json", url],
                    capture=True, check=False)
         if info.returncode != 0 or not info.stdout.strip():
-            print(f"Skipping unavailable/scheduled entry {video_id} ({title!r}); "
-                  "checking the next BhagvadGita entry.", flush=True)
+            detail = (info.stderr or "").strip().splitlines()
+            reason = detail[-1] if detail else "no metadata returned"
+            print(f"Skipping live entry {video_id} ({title!r}); yt-dlp error: {reason}",
+                  flush=True)
             continue
         try:
             meta = json.loads(info.stdout)
         except json.JSONDecodeError:
             print(f"Skipping entry {video_id}: YouTube returned invalid metadata.", flush=True)
+            continue
+
+        # Reconfirm the status from the full watch-page metadata before selecting.
+        if meta.get("live_status") not in ("is_live", "was_live"):
+            print(f"Skipping entry {video_id}: watch-page status is "
+                  f"{meta.get('live_status')!r}, not an actual livestream.", flush=True)
             continue
 
         timestamp = meta.get("release_timestamp") or meta.get("timestamp")
