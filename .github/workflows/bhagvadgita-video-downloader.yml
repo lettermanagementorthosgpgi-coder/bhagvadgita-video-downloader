@@ -48,6 +48,11 @@ jobs:
         with:
           node-version: "22"
 
+      - name: Install Deno JavaScript runtime for yt-dlp
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
       - name: Install yt-dlp and PO token plugin
         run: python -m pip install --upgrade yt-dlp bgutil-ytdlp-pot-provider==2.0.2
 
