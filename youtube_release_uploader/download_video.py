@@ -109,7 +109,7 @@ def current_release_video_id():
 
 
 def get_candidate():
-    channel_url = f"https://www.youtube.com/channel/{CHANNEL_ID}/videos"
+    channel_url = f"https://www.youtube.com/channel/{CHANNEL_ID}/streams"
     listing = run(["yt-dlp", "--flat-playlist", "--playlist-end", "50",
                    "--dump-single-json", channel_url], capture=True)
     entries = json.loads(listing.stdout).get("entries", [])
