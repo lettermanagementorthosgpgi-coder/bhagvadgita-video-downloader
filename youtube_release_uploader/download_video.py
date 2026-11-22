@@ -18,7 +18,7 @@ WORK = Path("work")
 WORK.mkdir(exist_ok=True)
 COOKIES_FILE = os.getenv("YOUTUBE_COOKIES_FILE")
 # Let yt-dlp and the installed PO-token provider negotiate supported YouTube clients.
-YT_DLP = ["yt-dlp"]
+YT_DLP = ["yt-dlp", "--js-runtimes", "deno"]
 if COOKIES_FILE:
     if not Path(COOKIES_FILE).is_file():
         raise RuntimeError("Configured YouTube cookies file is missing.")
@@ -232,9 +232,12 @@ def main():
         "ba[acodec^=mp4a]/"
         "b[height<=1080][height>=720][ext=mp4]"
     )
+    video_url = f"https://www.youtube.com/watch?v={video_id}"
+    print("Checking formats available for the selected livestream:", flush=True)
+    run(YT_DLP + ["--no-playlist", "--list-formats", video_url])
     run(YT_DLP + ["--no-playlist", "--format", format_selector,
          "--merge-output-format", "mp4", "--output", str(output),
-         f"https://www.youtube.com/watch?v={video_id}"])
+         video_url])
     downloaded = next(WORK.glob("downloaded.*"), None)
     if not downloaded:
         raise RuntimeError("yt-dlp completed without producing a file.")
