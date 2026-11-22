@@ -115,25 +115,60 @@ def get_candidate():
     entries = json.loads(listing.stdout).get("entries", [])
     now = dt.datetime.now(dt.timezone.utc).timestamp()
     candidates = []
+
+    # A channel may list a scheduled/live placeholder before the previous
+    # completed livestream. Such entries can have no playable metadata yet.
+    # Skip that one entry and continue checking older BhagvadGita uploads.
     for item in entries:
         title = item.get("title") or ""
         if not title.startswith(PREFIX):
             continue
         video_id = item.get("id")
         if not video_id:
+            print(f"Skipping BhagvadGita entry without a video ID: {title!r}", flush=True)
             continue
-        info = run(["yt-dlp", "--skip-download", "--dump-single-json",
-                    f"https://www.youtube.com/watch?v={video_id}"], capture=True)
-        meta = json.loads(info.stdout)
+
+        url = f"https://www.youtube.com/watch?v={video_id}"
+        info = run(["yt-dlp", "--skip-download", "--dump-single-json", url],
+                   capture=True, check=False)
+        if info.returncode != 0 or not info.stdout.strip():
+            print(f"Skipping unavailable/scheduled entry {video_id} ({title!r}); "
+                  "checking the next BhagvadGita entry.", flush=True)
+            continue
+        try:
+            meta = json.loads(info.stdout)
+        except json.JSONDecodeError:
+            print(f"Skipping entry {video_id}: YouTube returned invalid metadata.", flush=True)
+            continue
+
         timestamp = meta.get("release_timestamp") or meta.get("timestamp")
         if not timestamp:
-            upload_date = meta.get("upload_date")
+            upload_date = meta.get("upload_date") or item.get("upload_date")
             if upload_date:
-                timestamp = dt.datetime.strptime(upload_date, "%Y%m%d").replace(
-                    tzinfo=dt.timezone.utc).timestamp()
-        if timestamp and 0 <= now - float(timestamp) <= MAX_AGE_HOURS * 3600:
+                try:
+                    timestamp = dt.datetime.strptime(upload_date, "%Y%m%d").replace(
+                        tzinfo=dt.timezone.utc).timestamp()
+                except ValueError:
+                    timestamp = None
+
+        if not timestamp:
+            print(f"Skipping entry {video_id}: no reliable upload time.", flush=True)
+            continue
+
+        age_seconds = now - float(timestamp)
+        if 0 <= age_seconds <= MAX_AGE_HOURS * 3600:
             candidates.append((float(timestamp), video_id, meta.get("title") or title))
-    return max(candidates, default=None)
+        else:
+            print(f"Skipping entry {video_id}: outside the {MAX_AGE_HOURS}-hour window.",
+                  flush=True)
+
+    selected = max(candidates, default=None)
+    if selected:
+        print(f"Selected latest playable BhagvadGita upload: {selected[2]!r} "
+              f"({selected[1]}).", flush=True)
+    else:
+        print("No playable BhagvadGita upload found within the last 36 hours.", flush=True)
+    return selected
 
 
 def remove_non_source_assets():
