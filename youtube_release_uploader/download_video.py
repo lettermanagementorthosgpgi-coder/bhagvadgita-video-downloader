@@ -16,6 +16,8 @@ MAX_AGE_HOURS = 36
 MIN_BYTES = 1_000_000
 WORK = Path("work")
 WORK.mkdir(exist_ok=True)
+COOKIES_FILE = WORK / "cookies.txt"
+YT_DLP = ["yt-dlp", "--cookies", str(COOKIES_FILE)]
 
 
 def run(args, *, capture=False, check=True):
@@ -110,7 +112,7 @@ def current_release_video_id():
 
 def get_candidate():
     channel_url = f"https://www.youtube.com/channel/{CHANNEL_ID}/streams"
-    listing = run(["yt-dlp", "--flat-playlist", "--playlist-end", "50",
+    listing = run(YT_DLP + ["--flat-playlist", "--playlist-end", "50",
                    "--dump-single-json", channel_url], capture=True)
     entries = json.loads(listing.stdout).get("entries", [])
     now = dt.datetime.now(dt.timezone.utc).timestamp()
@@ -139,7 +141,7 @@ def get_candidate():
             continue
 
         url = f"https://www.youtube.com/watch?v={video_id}"
-        info = run(["yt-dlp", "--skip-download", "--dump-single-json", url],
+        info = run(YT_DLP + ["--skip-download", "--dump-single-json", url],
                    capture=True, check=False)
         if info.returncode != 0 or not info.stdout.strip():
             detail = (info.stderr or "").strip().splitlines()
@@ -225,7 +227,7 @@ def main():
         "ba[acodec^=mp4a]/"
         "b[height<=1080][height>=720][ext=mp4]"
     )
-    run(["yt-dlp", "--no-playlist", "--format", format_selector,
+    run(YT_DLP + ["--no-playlist", "--format", format_selector,
          "--merge-output-format", "mp4", "--output", str(output),
          f"https://www.youtube.com/watch?v={video_id}"])
     downloaded = next(WORK.glob("downloaded.*"), None)
