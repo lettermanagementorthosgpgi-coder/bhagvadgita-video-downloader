@@ -160,10 +160,22 @@ def get_candidate():
             print(f"Skipping entry {video_id}: YouTube returned invalid metadata.", flush=True)
             continue
 
-        # Reconfirm the status from the full watch-page metadata before selecting.
-        if meta.get("live_status") not in ("is_live", "was_live"):
+        # Prefer the full watch-page status when YouTube supplies it.
+        # For completed replays, yt-dlp can return live_status=None on the
+        # watch page even though the /streams listing explicitly marks the
+        # same entry as was_live. In that one case, trust the listing status.
+        # Any explicit non-live status from the watch page still overrides it.
+        watch_status = meta.get("live_status")
+        if watch_status in ("is_live", "was_live"):
+            confirmed_live_status = watch_status
+        elif watch_status is None and listing_status in ("is_live", "was_live"):
+            confirmed_live_status = listing_status
+            print(f"Watch-page live_status is missing for {video_id}; "
+                  f"using /streams status {listing_status!r} to confirm replay.",
+                  flush=True)
+        else:
             print(f"Skipping entry {video_id}: watch-page status is "
-                  f"{meta.get('live_status')!r}, not an actual livestream.", flush=True)
+                  f"{watch_status!r}, not an actual livestream.", flush=True)
             continue
 
         timestamp = meta.get("release_timestamp") or meta.get("timestamp")
