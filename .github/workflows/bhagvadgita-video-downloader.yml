@@ -52,8 +52,8 @@ jobs:
 
       - name: Start local YouTube PO token provider
         run: |
-          docker run -d --name bgutil-provider \\
-            -p 127.0.0.1:4416:4416 \\
+          docker run -d --name bgutil-provider \
+            -p 127.0.0.1:4416:4416 \
             brainicism/bgutil-ytdlp-pot-provider:2.0.2
           for attempt in $(seq 1 30); do
             code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 2 http://127.0.0.1:4416/ || true)
