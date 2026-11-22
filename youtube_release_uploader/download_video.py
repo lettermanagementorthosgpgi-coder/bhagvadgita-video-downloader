@@ -16,7 +16,12 @@ MAX_AGE_HOURS = 36
 MIN_BYTES = 1_000_000
 WORK = Path("work")
 WORK.mkdir(exist_ok=True)
+COOKIES_FILE = os.getenv("YOUTUBE_COOKIES_FILE")
 YT_DLP = ["yt-dlp", "--extractor-args", "youtube:player_client=mweb,web_safari"]
+if COOKIES_FILE:
+    if not Path(COOKIES_FILE).is_file():
+        raise RuntimeError("Configured YouTube cookies file is missing.")
+    YT_DLP += ["--cookies", COOKIES_FILE]
 
 
 def run(args, *, capture=False, check=True):
