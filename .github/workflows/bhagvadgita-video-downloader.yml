@@ -1,8 +1,9 @@
 name: BhagvadGita Video Downloader
 
 on:
-  schedule:
-    - cron: "30 0 * * *" # 06:00 Asia/Kolkata
+  # TEMPORARILY PAUSED during safe testing; restore after dry-run validation.
+  # schedule:
+  #   - cron: "30 0 * * *" # 06:00 Asia/Kolkata
   workflow_dispatch:
     inputs:
       dry_run:
