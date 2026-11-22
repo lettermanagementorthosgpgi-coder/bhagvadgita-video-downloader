@@ -95,7 +95,7 @@ jobs:
           for line in lines:
               if not line or line.startswith("#") and not line.startswith("#HttpOnly_"):
                   continue
-              fields = line.split("\\t")
+              fields = line.split("\t")
               if len(fields) >= 7:
                   domain = fields[0].removeprefix("#HttpOnly_").lstrip(".").lower()
                   if domain == "youtube.com" or domain.endswith(".youtube.com"):
