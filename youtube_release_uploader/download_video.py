@@ -210,6 +210,81 @@ def get_candidate():
     print("No actual BhagvadGita live/replay was found in the /streams listing.")
     return None
 
+
+def diagnose_youtube_access(video_url):
+    """Compare anonymous and cookie-authenticated access without exposing cookie contents."""
+    import socket
+    import urllib.error
+    import urllib.request
+
+    print("\\n=== YOUTUBE ACCESS DIAGNOSTICS (NO DOWNLOAD / NO RELEASE WRITES) ===", flush=True)
+    print(f"Runner OS: {os.getenv('RUNNER_OS', 'unknown')} | Python: {sys.version.split()[0]}", flush=True)
+    try:
+        version = run(["yt-dlp", "--version"], capture=True).stdout.strip()
+        print(f"yt-dlp version: {version}", flush=True)
+    except Exception as exc:
+        print(f"yt-dlp version check failed: {type(exc).__name__}: {exc}", flush=True)
+
+    for host in ("www.youtube.com", "youtubei.googleapis.com", "googlevideo.com"):
+        try:
+            addresses = sorted({x[4][0] for x in socket.getaddrinfo(host, 443, type=socket.SOCK_STREAM)})
+            print(f"DNS {host}: OK ({', '.join(addresses[:3])})", flush=True)
+        except Exception as exc:
+            print(f"DNS {host}: FAIL ({type(exc).__name__}: {exc})", flush=True)
+
+    for url in ("https://www.youtube.com/robots.txt", video_url):
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=20) as response:
+                print(f"HTTP {url.split('/')[2]}: {response.status}", flush=True)
+        except urllib.error.HTTPError as exc:
+            print(f"HTTP {url.split('/')[2]}: HTTP_ERROR {exc.code}", flush=True)
+        except Exception as exc:
+            print(f"HTTP {url.split('/')[2]}: NETWORK_ERROR {type(exc).__name__}: {exc}", flush=True)
+
+    if COOKIES_FILE:
+        try:
+            lines = Path(COOKIES_FILE).read_text(errors="replace").splitlines()
+            records = [line for line in lines if line and not line.startswith("#") and "\\t" in line]
+            domains = sorted({line.split("\\t")[0] for line in records})
+            print(f"Cookie file: present; bytes={Path(COOKIES_FILE).stat().st_size}; records={len(records)}; youtube_domain_present={any('youtube.com' in d for d in domains)}. Values are not displayed.", flush=True)
+        except Exception as exc:
+            print(f"Cookie file inspection: FAIL ({type(exc).__name__}: {exc})", flush=True)
+    else:
+        print("Cookie file: not configured", flush=True)
+
+    def classify(output, code):
+        value = (output or "").lower()
+        if "login_required" in value or "sign in to confirm you're not a bot" in value:
+            return "LOGIN_REQUIRED_OR_IP_CHALLENGE"
+        if "http error 403" in value or "http error 429" in value:
+            return "HTTP_403_OR_429"
+        if "po token" in value and any(x in value for x in ("missing", "required", "unable")):
+            return "PO_TOKEN_MISSING_OR_REJECTED"
+        if "requested format is not available" in value or "no video formats found" in value:
+            return "PLAYER_RESPONSE_WITHOUT_USABLE_FORMATS"
+        if "video unavailable" in value:
+            return "VIDEO_UNAVAILABLE_OR_NOT_PUBLIC"
+        return "OK_FORMATS_AVAILABLE" if code == 0 else "OTHER_YTDLP_ERROR"
+
+    anonymous = [x for x in YT_DLP if x != "--cookies" and x != COOKIES_FILE]
+    probes = [("ANONYMOUS_NO_COOKIES", anonymous)]
+    if COOKIES_FILE:
+        probes.append(("CONFIGURED_COOKIES", YT_DLP))
+    for label, command in probes:
+        print(f"\\n--- {label} ---", flush=True)
+        result = run(command + ["--verbose", "--no-playlist", "--list-formats", video_url],
+                     capture=True, check=False)
+        combined = (result.stdout or "") + "\\n" + (result.stderr or "")
+        print(f"RESULT {label}: {classify(combined, result.returncode)} (exit={result.returncode})", flush=True)
+        for marker in ("PO Token Providers:", "LOGIN_REQUIRED", "Sign in to confirm you're not a bot",
+                       "HTTP Error 403", "Requested format is not available", "Available formats"):
+            for line in [x.strip() for x in combined.splitlines() if marker.lower() in x.lower()][:2]:
+                if "cookie" not in line.lower() and "authorization" not in line.lower():
+                    print("DIAG: " + line[:400], flush=True)
+    print("=== END DIAGNOSTICS. No video downloaded; Release unchanged. ===", flush=True)
+
+
 def remove_non_source_assets():
     """After the new source.mp4 is verified, delete every other Release asset."""
     for asset in release_assets():
@@ -231,6 +306,10 @@ def main():
         print("No BhagvadGita-prefixed upload found within the last 36 hours. Release unchanged.")
         return
     _, video_id, title = candidate
+    video_url = f"https://www.youtube.com/watch?v={video_id}"
+    if os.getenv("DIAGNOSTIC_MODE", "false").lower() == "true":
+        diagnose_youtube_access(video_url)
+        return
 
     if not DRY_RUN:
         existing_id = current_release_video_id()
