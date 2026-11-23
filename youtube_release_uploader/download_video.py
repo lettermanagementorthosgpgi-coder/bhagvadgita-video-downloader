@@ -217,7 +217,7 @@ def diagnose_youtube_access(video_url):
     import urllib.error
     import urllib.request
 
-    print("\\n=== YOUTUBE ACCESS DIAGNOSTICS (NO DOWNLOAD / NO RELEASE WRITES) ===", flush=True)
+    print("\n=== YOUTUBE ACCESS DIAGNOSTICS (NO DOWNLOAD / NO RELEASE WRITES) ===", flush=True)
     print(f"Runner OS: {os.getenv('RUNNER_OS', 'unknown')} | Python: {sys.version.split()[0]}", flush=True)
     try:
         version = run(["yt-dlp", "--version"], capture=True).stdout.strip()
@@ -245,8 +245,8 @@ def diagnose_youtube_access(video_url):
     if COOKIES_FILE:
         try:
             lines = Path(COOKIES_FILE).read_text(errors="replace").splitlines()
-            records = [line for line in lines if line and not line.startswith("#") and "\\t" in line]
-            domains = sorted({line.split("\\t")[0] for line in records})
+            records = [line for line in lines if line and not line.startswith("#") and "\t" in line]
+            domains = sorted({line.split("\t")[0] for line in records})
             print(f"Cookie file: present; bytes={Path(COOKIES_FILE).stat().st_size}; records={len(records)}; youtube_domain_present={any('youtube.com' in d for d in domains)}. Values are not displayed.", flush=True)
         except Exception as exc:
             print(f"Cookie file inspection: FAIL ({type(exc).__name__}: {exc})", flush=True)
@@ -272,10 +272,10 @@ def diagnose_youtube_access(video_url):
     if COOKIES_FILE:
         probes.append(("CONFIGURED_COOKIES", YT_DLP))
     for label, command in probes:
-        print(f"\\n--- {label} ---", flush=True)
+        print(f"\n--- {label} ---", flush=True)
         result = run(command + ["--verbose", "--no-playlist", "--list-formats", video_url],
                      capture=True, check=False)
-        combined = (result.stdout or "") + "\\n" + (result.stderr or "")
+        combined = (result.stdout or "") + "\n" + (result.stderr or "")
         print(f"RESULT {label}: {classify(combined, result.returncode)} (exit={result.returncode})", flush=True)
         for marker in ("PO Token Providers:", "LOGIN_REQUIRED", "Sign in to confirm you're not a bot",
                        "HTTP Error 403", "Requested format is not available", "Available formats"):
