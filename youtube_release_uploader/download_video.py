@@ -267,15 +267,24 @@ def diagnose_youtube_access(video_url):
             return "VIDEO_UNAVAILABLE_OR_NOT_PUBLIC"
         return "OK_FORMATS_AVAILABLE" if code == 0 else "OTHER_YTDLP_ERROR"
 
-    anonymous = [x for x in YT_DLP if x != "--cookies" and x != COOKIES_FILE]
-    probes = [("ANONYMOUS_NO_COOKIES", anonymous)]
-    if COOKIES_FILE:
-        probes.append(("CONFIGURED_COOKIES", YT_DLP))
+    # Test each player independently on the same runner/video, first anonymously
+    # and then with the configured cookie jar. The installed bgutil provider remains
+    # available to yt-dlp in every probe. This is diagnostic-only: no media download.
+    clients = ("mweb", "tv_samsung", "web_safari")
+    base = ["yt-dlp", "--js-runtimes", "deno"]
+    probes = []
+    for client in clients:
+        client_args = base + ["--extractor-args", f"youtube:player_client={client}"]
+        probes.append((f"{client.upper()}_NO_COOKIES", client_args))
+        if COOKIES_FILE:
+            probes.append((f"{client.upper()}_WITH_COOKIES",
+                           client_args + ["--cookies", COOKIES_FILE]))
+
     for label, command in probes:
-        print(f"\n--- {label} ---", flush=True)
+        print(f"\\n--- PLAYER PROBE {label} ---", flush=True)
         result = run(command + ["--verbose", "--no-playlist", "--list-formats", video_url],
                      capture=True, check=False)
-        combined = (result.stdout or "") + "\n" + (result.stderr or "")
+        combined = (result.stdout or "") + "\\n" + (result.stderr or "")
         print(f"RESULT {label}: {classify(combined, result.returncode)} (exit={result.returncode})", flush=True)
         for marker in ("PO Token Providers:", "LOGIN_REQUIRED", "Sign in to confirm you're not a bot",
                        "HTTP Error 403", "Requested format is not available", "Available formats"):
