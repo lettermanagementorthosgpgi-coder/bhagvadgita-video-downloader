@@ -123,6 +123,9 @@ def current_release_video_id():
 
 
 def get_candidate():
+    target_video_id = os.getenv("TARGET_VIDEO_ID", "").strip()
+    if target_video_id:
+        print(f"Manual target requested: {target_video_id}", flush=True)
     channel_url = f"https://www.youtube.com/channel/{CHANNEL_ID}/streams"
     listing = run(YT_DLP + ["--flat-playlist", "--playlist-end", "50",
                    "--dump-single-json", channel_url], capture=True)
@@ -132,9 +135,19 @@ def get_candidate():
     # /streams is newest-first. Skip scheduled placeholders and non-BhagvadGita
     # entries, then inspect only the first actual BhagvadGita live/replay.
     # Never fall back to older videos if this newest candidate fails.
+    target_found = False
     for item in entries:
+        video_id = item.get("id")
+        if target_video_id and video_id != target_video_id:
+            continue
+        if target_video_id:
+            target_found = True
         title = item.get("title") or ""
         if not title.startswith(PREFIX):
+            if target_video_id:
+                print(f"Requested video {target_video_id} does not have the required "
+                      f"{PREFIX!r} title prefix; refusing to download.", flush=True)
+                return None
             continue
 
         video_id = item.get("id")
@@ -220,7 +233,11 @@ def get_candidate():
               f"({video_id}; {confirmed_live_status}).", flush=True)
         return (float(timestamp), video_id, selected_title)
 
-    print("No actual BhagvadGita live/replay was found in the /streams listing.")
+    if target_video_id and not target_found:
+        print(f"Requested video {target_video_id} was not found in the channel's "
+              "latest 50 /streams entries; refusing to substitute another video.", flush=True)
+    else:
+        print("No actual BhagvadGita live/replay was found in the /streams listing.")
     return None
 
 
