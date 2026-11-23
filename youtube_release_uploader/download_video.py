@@ -281,10 +281,10 @@ def diagnose_youtube_access(video_url):
                            client_args + ["--cookies", COOKIES_FILE]))
 
     for label, command in probes:
-        print(f"\\n--- PLAYER PROBE {label} ---", flush=True)
+        print(f"\n--- PLAYER PROBE {label} ---", flush=True)
         result = run(command + ["--verbose", "--no-playlist", "--list-formats", video_url],
                      capture=True, check=False)
-        combined = (result.stdout or "") + "\\n" + (result.stderr or "")
+        combined = (result.stdout or "") + "\n" + (result.stderr or "")
         print(f"RESULT {label}: {classify(combined, result.returncode)} (exit={result.returncode})", flush=True)
         for marker in ("PO Token Providers:", "LOGIN_REQUIRED", "Sign in to confirm you're not a bot",
                        "HTTP Error 403", "Requested format is not available", "Available formats"):
