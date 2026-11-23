@@ -269,10 +269,10 @@ def diagnose_youtube_access(video_url):
     def redact_token_values(line):
         """Keep diagnostic state while never printing token/cookie values."""
         line = re.sub(
-            r"(?i)(\\b(?:po[\\s_-]*token|token|authorization|cookie)\\b\\s*[\\\"']?\\s*[:=]\\s*[\\\"']?)([A-Za-z0-9._~+/=-]{8,})",
-            r"\\1[REDACTED]", line
+            r"(?i)(\b(?:po[\s_-]*token|token|authorization|cookie)\b\s*["']?\s*[:=]\s*["']?)([A-Za-z0-9._~+/=-]{8,})",
+            r"\1[REDACTED]", line
         )
-        line = re.sub(r"(?i)([?&](?:po_token|pot|token)=)[^&\\s]+", r"\\1[REDACTED]", line)
+            r"\1[REDACTED]", line
         return line
 
     def classify(output, code):
@@ -344,7 +344,7 @@ def diagnose_youtube_access(video_url):
     # that merely starts from one that actually receives and handles token requests.
     provider_logs = run(["docker", "logs", "--tail", "100", "bgutil-provider"],
                         capture=True, check=False)
-    provider_output = (provider_logs.stdout or "") + "\\n" + (provider_logs.stderr or "")
+    provider_output = (provider_logs.stdout or "") + "\n" + (provider_logs.stderr or "")
     if provider_output.strip():
         print("--- BGUTIL PROVIDER LOGS (last 100 lines; secrets omitted) ---", flush=True)
         for line in provider_output.splitlines()[-100:]:
