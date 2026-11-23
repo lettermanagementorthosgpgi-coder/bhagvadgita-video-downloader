@@ -222,11 +222,16 @@ def get_candidate():
             return None
 
         age_seconds = now - float(timestamp)
-        if not 0 <= age_seconds <= MAX_AGE_HOURS * 3600:
+        # An explicitly selected video ID is a deliberate manual override of
+        # the automatic recency window. Keep the 36-hour limit for auto-selection.
+        if not target_video_id and not 0 <= age_seconds <= MAX_AGE_HOURS * 3600:
             print(f"Newest BhagvadGita live/replay {video_id} is outside the "
                   f"{MAX_AGE_HOURS}-hour window; stopping without checking older videos.",
                   flush=True)
             return None
+        if target_video_id:
+            print("Manual video ID selected; automatic 36-hour age limit is bypassed.",
+                  flush=True)
 
         selected_title = meta.get("title") or title
         print(f"Selected newest BhagvadGita live/replay: {selected_title!r} "
@@ -401,9 +406,13 @@ def main():
         return
     _, video_id, title = candidate
     video_url = f"https://www.youtube.com/watch?v={video_id}"
-    if os.getenv("DIAGNOSTIC_MODE", "false").lower() == "true" or DRY_RUN:
+    if os.getenv("DIAGNOSTIC_MODE", "false").lower() == "true":
         diagnose_youtube_access(video_url)
         return
+    if DRY_RUN:
+        diagnose_youtube_access(video_url)
+        print("DRY RUN: diagnostics completed; continuing with a real download and "
+              "local validation. Release will remain unchanged.", flush=True)
 
     if not DRY_RUN:
         existing_id = current_release_video_id()
