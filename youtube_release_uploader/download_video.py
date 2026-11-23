@@ -295,10 +295,10 @@ def diagnose_youtube_access(video_url):
         )
         if any(marker in value for marker in po_token_failure_markers):
             return "PO_TOKEN_GENERATION_OR_REJECTION_ERROR"
-        if "requested format is not available" in value or "no video formats found" in value:
-            return "PLAYER_RESPONSE_WITHOUT_USABLE_FORMATS"
         if "this live event has ended" in value:
             return "YOUTUBE_REPLAY_NOT_READY_OR_UNAVAILABLE"
+        if "requested format is not available" in value or "no video formats found" in value:
+            return "PLAYER_RESPONSE_WITHOUT_USABLE_FORMATS"
         if "video unavailable" in value:
             return "VIDEO_UNAVAILABLE_OR_NOT_PUBLIC"
         return "OK_FORMATS_AVAILABLE" if code == 0 else "OTHER_YTDLP_ERROR"
