@@ -307,7 +307,7 @@ def main():
         return
     _, video_id, title = candidate
     video_url = f"https://www.youtube.com/watch?v={video_id}"
-    if os.getenv("DIAGNOSTIC_MODE", "false").lower() == "true":
+    if os.getenv("DIAGNOSTIC_MODE", "false").lower() == "true" or DRY_RUN:
         diagnose_youtube_access(video_url)
         return
 
