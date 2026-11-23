@@ -426,11 +426,12 @@ def main():
         print("DRY RUN: skipping Release duplicate check; no Release API will be called.")
 
     output = WORK / "downloaded.%(ext)s"
-    format_selector = (
-        "bv*[height<=1080][height>=720][vcodec^=avc1]+"
-        "ba[acodec^=mp4a]/"
-        "b[height<=1080][height>=720][ext=mp4]"
-    )
+    # Livestream replays may expose portrait HLS formats (for example
+    # 720x1280 and 1080x1920) as a single muxed MP4 stream. Filtering on
+    # height<=1080 incorrectly rejects those valid 720p/1080p portrait files.
+    # Select the best H.264/AAC MP4 regardless of orientation; probe_video()
+    # enforces the approved minimum using the shorter dimension >= 720.
+    format_selector = "b[ext=mp4][vcodec^=avc1][acodec^=mp4a]"
     video_url = f"https://www.youtube.com/watch?v={video_id}"
     print("Checking formats available for the selected livestream:", flush=True)
     # Verbose mode records whether bgutil providers were loaded and whether
