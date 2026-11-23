@@ -3,6 +3,7 @@
 import datetime as dt
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -168,6 +169,11 @@ def get_candidate():
             return None
 
         watch_status = meta.get("live_status")
+        formats_count = len(meta.get("formats") or [])
+        print(f"REPLAY STATE {video_id}: listing_live_status={listing_status!r}; "
+              f"watch_live_status={watch_status!r}; formats_reported={formats_count}; "
+              f"is_live={meta.get('is_live')!r}; was_live={meta.get('was_live')!r}.",
+              flush=True)
         # yt-dlp may report a completed livestream as "post_live" on the
         # watch page even when /streams listed it as "was_live". Both are
         # completed livestream replays and are eligible for this downloader.
@@ -260,6 +266,15 @@ def diagnose_youtube_access(video_url):
     else:
         print("Cookie file: not configured", flush=True)
 
+    def redact_token_values(line):
+        """Keep diagnostic state while never printing token/cookie values."""
+        line = re.sub(
+            r"(?i)(\\b(?:po[\\s_-]*token|token|authorization|cookie)\\b\\s*[\\\"']?\\s*[:=]\\s*[\\\"']?)([A-Za-z0-9._~+/=-]{8,})",
+            r"\\1[REDACTED]", line
+        )
+        line = re.sub(r"(?i)([?&](?:po_token|pot|token)=)[^&\\s]+", r"\\1[REDACTED]", line)
+        return line
+
     def classify(output, code):
         value = (output or "").lower()
         if "login_required" in value or "sign in to confirm you're not a bot" in value:
@@ -282,6 +297,8 @@ def diagnose_youtube_access(video_url):
             return "PO_TOKEN_GENERATION_OR_REJECTION_ERROR"
         if "requested format is not available" in value or "no video formats found" in value:
             return "PLAYER_RESPONSE_WITHOUT_USABLE_FORMATS"
+        if "this live event has ended" in value:
+            return "YOUTUBE_REPLAY_NOT_READY_OR_UNAVAILABLE"
         if "video unavailable" in value:
             return "VIDEO_UNAVAILABLE_OR_NOT_PUBLIC"
         return "OK_FORMATS_AVAILABLE" if code == 0 else "OTHER_YTDLP_ERROR"
@@ -289,7 +306,7 @@ def diagnose_youtube_access(video_url):
     # Test each player independently on the same runner/video, first anonymously
     # and then with the configured cookie jar. The installed bgutil provider remains
     # available to yt-dlp in every probe. This is diagnostic-only: no media download.
-    clients = ("mweb", "tv_samsung", "web_safari")
+    clients = ("mweb", "tv_samsung", "web_safari", "web")
     base = ["yt-dlp", "--js-runtimes", "deno"]
     probes = []
     for client in clients:
@@ -314,10 +331,12 @@ def diagnose_youtube_access(video_url):
                 "[pot]", "po token", "bgutil", "login_required",
                 "sign in to confirm you're not a bot", "http error 403",
                 "http error 429", "requested format is not available",
-                "available formats", "error:"
+                "available formats", "error:", "post-live", "post_live",
+                "manifestless", "being processed", "live_status",
+                "this live event has ended", "archive"
             )):
                 if "cookie" not in low and "authorization" not in low:
-                    relevant.append(line.strip())
+                    relevant.append(redact_token_values(line.strip()))
         for line in relevant[:16]:
             print("DIAG: " + line[:500], flush=True)
 
@@ -330,8 +349,10 @@ def diagnose_youtube_access(video_url):
         print("--- BGUTIL PROVIDER LOGS (last 100 lines; secrets omitted) ---", flush=True)
         for line in provider_output.splitlines()[-100:]:
             low = line.lower()
-            if not any(secret_word in low for secret_word in ("cookie", "authorization", "token=")):
-                print("PROVIDER: " + line[:500], flush=True)
+            safe_line = redact_token_values(line)
+            # Do not emit cookie/authorization headers, even after token redaction.
+            if not any(secret_word in low for secret_word in ("cookie", "authorization")):
+                print("PROVIDER: " + safe_line[:500], flush=True)
     else:
         print("Provider log capture returned no output.", flush=True)
 
