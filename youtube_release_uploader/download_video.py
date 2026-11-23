@@ -127,50 +127,46 @@ def get_candidate():
                    "--dump-single-json", channel_url], capture=True)
     entries = json.loads(listing.stdout).get("entries", [])
     now = dt.datetime.now(dt.timezone.utc).timestamp()
-    candidates = []
 
-    # A channel may list a scheduled/live placeholder before the previous
-    # completed livestream. Such entries can have no playable metadata yet.
-    # Skip that one entry and continue checking older BhagvadGita uploads.
+    # /streams is newest-first. Skip scheduled placeholders and non-BhagvadGita
+    # entries, then inspect only the first actual BhagvadGita live/replay.
+    # Never fall back to older videos if this newest candidate fails.
     for item in entries:
         title = item.get("title") or ""
         if not title.startswith(PREFIX):
             continue
+
         video_id = item.get("id")
         if not video_id:
-            print(f"Skipping BhagvadGita entry without a video ID: {title!r}", flush=True)
-            continue
+            print(f"Newest BhagvadGita entry has no video ID: {title!r}; stopping.",
+                  flush=True)
+            return None
 
-        # The /streams tab also contains upcoming scheduled broadcasts.
-        # Do not even request their watch-page metadata: only actual live
-        # broadcasts and completed livestream replays are eligible.
         listing_status = item.get("live_status")
         if listing_status not in ("is_live", "was_live"):
             print(f"Skipping non-live/scheduled entry {video_id} "
-                  f"(live_status={listing_status!r}); only actual livestreams are checked.",
+                  f"(live_status={listing_status!r}); looking for the newest actual replay.",
                   flush=True)
             continue
 
         url = f"https://www.youtube.com/watch?v={video_id}"
-        info = run(YT_DLP + ["--ignore-no-formats-error", "--skip-download", "--dump-single-json", url],
+        info = run(YT_DLP + ["--ignore-no-formats-error", "--skip-download",
+                             "--dump-single-json", url],
                    capture=True, check=False)
         if info.returncode != 0 or not info.stdout.strip():
             detail = (info.stderr or "").strip().splitlines()
             reason = detail[-1] if detail else "no metadata returned"
-            print(f"Skipping live entry {video_id} ({title!r}); yt-dlp error: {reason}",
-                  flush=True)
-            continue
+            print(f"Newest BhagvadGita live/replay {video_id} could not be inspected: "
+                  f"{reason}. Stopping; older videos will not be checked.", flush=True)
+            return None
+
         try:
             meta = json.loads(info.stdout)
         except json.JSONDecodeError:
-            print(f"Skipping entry {video_id}: YouTube returned invalid metadata.", flush=True)
-            continue
+            print(f"YouTube returned invalid metadata for newest candidate {video_id}; "
+                  "stopping without checking older videos.", flush=True)
+            return None
 
-        # Prefer the full watch-page status when YouTube supplies it.
-        # For completed replays, yt-dlp can return live_status=None on the
-        # watch page even though the /streams listing explicitly marks the
-        # same entry as was_live. In that one case, trust the listing status.
-        # Any explicit non-live status from the watch page still overrides it.
         watch_status = meta.get("live_status")
         if watch_status in ("is_live", "was_live"):
             confirmed_live_status = watch_status
@@ -180,9 +176,9 @@ def get_candidate():
                   f"using /streams status {listing_status!r} to confirm replay.",
                   flush=True)
         else:
-            print(f"Skipping entry {video_id}: watch-page status is "
-                  f"{watch_status!r}, not an actual livestream.", flush=True)
-            continue
+            print(f"Newest candidate {video_id} has watch-page status "
+                  f"{watch_status!r}, not an actual livestream. Stopping.", flush=True)
+            return None
 
         timestamp = meta.get("release_timestamp") or meta.get("timestamp")
         if not timestamp:
@@ -195,24 +191,24 @@ def get_candidate():
                     timestamp = None
 
         if not timestamp:
-            print(f"Skipping entry {video_id}: no reliable upload time.", flush=True)
-            continue
+            print(f"Newest candidate {video_id} has no reliable upload time; stopping.",
+                  flush=True)
+            return None
 
         age_seconds = now - float(timestamp)
-        if 0 <= age_seconds <= MAX_AGE_HOURS * 3600:
-            candidates.append((float(timestamp), video_id, meta.get("title") or title))
-        else:
-            print(f"Skipping entry {video_id}: outside the {MAX_AGE_HOURS}-hour window.",
+        if not 0 <= age_seconds <= MAX_AGE_HOURS * 3600:
+            print(f"Newest BhagvadGita live/replay {video_id} is outside the "
+                  f"{MAX_AGE_HOURS}-hour window; stopping without checking older videos.",
                   flush=True)
+            return None
 
-    selected = max(candidates, default=None)
-    if selected:
-        print(f"Selected latest playable BhagvadGita upload: {selected[2]!r} "
-              f"({selected[1]}).", flush=True)
-    else:
-        print("No playable BhagvadGita upload found within the last 36 hours.", flush=True)
-    return selected
+        selected_title = meta.get("title") or title
+        print(f"Selected newest BhagvadGita live/replay: {selected_title!r} "
+              f"({video_id}; {confirmed_live_status}).", flush=True)
+        return (float(timestamp), video_id, selected_title)
 
+    print("No actual BhagvadGita live/replay was found in the /streams listing.")
+    return None
 
 def remove_non_source_assets():
     """After the new source.mp4 is verified, delete every other Release asset."""
