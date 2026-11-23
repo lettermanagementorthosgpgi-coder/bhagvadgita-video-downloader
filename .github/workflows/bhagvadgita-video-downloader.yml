@@ -11,6 +11,11 @@ on:
         required: true
         type: boolean
         default: true
+      target_video_id:
+        description: "Optional exact YouTube video ID; leave blank for newest eligible live"
+        required: false
+        type: string
+        default: "W0L33pRCXlA"
 
 permissions:
   contents: write
@@ -29,6 +34,7 @@ jobs:
       YOUTUBE_CHANNEL_ID: UC2sBCYCH6Kb9dgqQN3vVgFw
       RELEASE_TAG: Friday
       DRY_RUN: ${{ github.event_name == 'schedule' && 'false' || inputs.dry_run }}
+      TARGET_VIDEO_ID: ${{ inputs.target_video_id }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
