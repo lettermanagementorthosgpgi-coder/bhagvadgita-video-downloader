@@ -266,8 +266,20 @@ def diagnose_youtube_access(video_url):
             return "LOGIN_REQUIRED_OR_IP_CHALLENGE"
         if "http error 403" in value or "http error 429" in value:
             return "HTTP_403_OR_429"
-        if "po token" in value and any(x in value for x in ("missing", "required", "unable")):
-            return "PO_TOKEN_MISSING_OR_REJECTED"
+        # Do not classify provider inventory messages such as
+        # "script-node ... unavailable" as a PO-token failure.
+        po_token_failure_markers = (
+            "failed to retrieve po token",
+            "unable to retrieve po token",
+            "failed to generate po token",
+            "unable to generate po token",
+            "no po token available",
+            "invalid po token",
+            "po token was rejected",
+            "po token is required but",
+        )
+        if any(marker in value for marker in po_token_failure_markers):
+            return "PO_TOKEN_GENERATION_OR_REJECTION_ERROR"
         if "requested format is not available" in value or "no video formats found" in value:
             return "PLAYER_RESPONSE_WITHOUT_USABLE_FORMATS"
         if "video unavailable" in value:
@@ -293,11 +305,36 @@ def diagnose_youtube_access(video_url):
                      capture=True, check=False)
         combined = (result.stdout or "") + "\n" + (result.stderr or "")
         print(f"RESULT {label}: {classify(combined, result.returncode)} (exit={result.returncode})", flush=True)
-        for marker in ("PO Token Providers:", "LOGIN_REQUIRED", "Sign in to confirm you're not a bot",
-                       "HTTP Error 403", "Requested format is not available", "Available formats"):
-            for line in [x.strip() for x in combined.splitlines() if marker.lower() in x.lower()][:2]:
-                if "cookie" not in line.lower() and "authorization" not in line.lower():
-                    print("DIAG: " + line[:400], flush=True)
+        # Show actual PO-token/provider activity and concrete extractor errors.
+        # Provider availability inventory alone is not evidence of token failure.
+        relevant = []
+        for line in combined.splitlines():
+            low = line.lower()
+            if any(term in low for term in (
+                "[pot]", "po token", "bgutil", "login_required",
+                "sign in to confirm you're not a bot", "http error 403",
+                "http error 429", "requested format is not available",
+                "available formats", "error:"
+            )):
+                if "cookie" not in low and "authorization" not in low:
+                    relevant.append(line.strip())
+        for line in relevant[:16]:
+            print("DIAG: " + line[:500], flush=True)
+
+    # Capture provider-side logs after all probes. This distinguishes a provider
+    # that merely starts from one that actually receives and handles token requests.
+    provider_logs = run(["docker", "logs", "--tail", "100", "bgutil-provider"],
+                        capture=True, check=False)
+    provider_output = (provider_logs.stdout or "") + "\\n" + (provider_logs.stderr or "")
+    if provider_output.strip():
+        print("--- BGUTIL PROVIDER LOGS (last 100 lines; secrets omitted) ---", flush=True)
+        for line in provider_output.splitlines()[-100:]:
+            low = line.lower()
+            if not any(secret_word in low for secret_word in ("cookie", "authorization", "token=")):
+                print("PROVIDER: " + line[:500], flush=True)
+    else:
+        print("Provider log capture returned no output.", flush=True)
+
     print("=== END DIAGNOSTICS. No video downloaded; Release unchanged. ===", flush=True)
 
 
