@@ -24,6 +24,9 @@ COOKIES_FILE = os.getenv("YOUTUBE_COOKIES_FILE")
 # tv and web_safari remain fallbacks if YouTube rejects that client.
 YT_DLP = [
     "yt-dlp", "--js-runtimes", "deno",
+    # yt-dlp needs its EJS challenge solver components to extract direct
+    # media URLs from current YouTube SABR/player responses.
+    "--remote-components", "ejs:github",
     "--extractor-args", "youtube:player-client=mweb,tv,web_safari",
 ]
 if COOKIES_FILE:
