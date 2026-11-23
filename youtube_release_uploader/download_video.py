@@ -168,16 +168,23 @@ def get_candidate():
             return None
 
         watch_status = meta.get("live_status")
-        if watch_status in ("is_live", "was_live"):
-            confirmed_live_status = watch_status
-        elif watch_status is None and listing_status in ("is_live", "was_live"):
-            confirmed_live_status = listing_status
+        # yt-dlp may report a completed livestream as "post_live" on the
+        # watch page even when /streams listed it as "was_live". Both are
+        # completed livestream replays and are eligible for this downloader.
+        if watch_status in ("is_live", "was_live", "post_live"):
+            confirmed_live_status = (
+                "was_live" if watch_status == "post_live" else watch_status
+            )
+        elif watch_status is None and listing_status in ("is_live", "was_live", "post_live"):
+            confirmed_live_status = (
+                "was_live" if listing_status == "post_live" else listing_status
+            )
             print(f"Watch-page live_status is missing for {video_id}; "
                   f"using /streams status {listing_status!r} to confirm replay.",
                   flush=True)
         else:
             print(f"Newest candidate {video_id} has watch-page status "
-                  f"{watch_status!r}, not an actual livestream. Stopping.", flush=True)
+                  f"{watch_status!r}, not an actual livestream/replay. Stopping.", flush=True)
             return None
 
         timestamp = meta.get("release_timestamp") or meta.get("timestamp")
