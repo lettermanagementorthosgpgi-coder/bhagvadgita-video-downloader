@@ -15,7 +15,7 @@ on:
         description: "Optional exact YouTube video ID; leave blank for newest eligible live"
         required: false
         type: string
-        default: "W0L33pRCXlA"
+        default: ""
 
 permissions:
   contents: write
