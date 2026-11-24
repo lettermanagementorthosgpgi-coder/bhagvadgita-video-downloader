@@ -7,10 +7,10 @@ on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: "Download and validate only; do not touch Release assets"
+        description: "Download, validate, publish source.mp4 to Friday Release, and remove other Release assets"
         required: true
         type: boolean
-        default: true
+        default: false
       target_video_id:
         description: "Optional exact YouTube video ID; leave blank for newest eligible live"
         required: false
