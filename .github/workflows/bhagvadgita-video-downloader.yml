@@ -10,7 +10,7 @@ on:
         description: "Download, validate, publish source.mp4 to Friday Release, and remove other Release assets"
         required: true
         type: boolean
-        default: false
+        default: true
       target_video_id:
         description: "Optional exact YouTube video ID; leave blank for newest eligible live"
         required: false
@@ -29,7 +29,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 240
     env:
-      GITHUB_TOKEN: ${{ github.token }}
+      # Use the existing PAT secret for cross-repository Release access.
+      GH_TOKEN: ${{ secrets.RELEASE_REPO_TOKEN }}
+      TARGET_RELEASE_REPOSITORY: lettermanagementorthosgpgi-coder/jyotirlingshivmathlive
       GITHUB_REPOSITORY: ${{ github.repository }}
       YOUTUBE_CHANNEL_ID: UC2sBCYCH6Kb9dgqQN3vVgFw
       RELEASE_TAG: Friday
