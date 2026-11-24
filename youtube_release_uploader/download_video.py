@@ -11,7 +11,7 @@ from pathlib import Path
 CHANNEL_ID = os.environ["YOUTUBE_CHANNEL_ID"]
 RELEASE_TAG = os.getenv("RELEASE_TAG", "Friday")
 DRY_RUN = os.getenv("DRY_RUN", "false").lower() == "true"
-REPO = os.environ["GITHUB_REPOSITORY"]
+REPO = os.getenv("TARGET_RELEASE_REPOSITORY", os.environ["GITHUB_REPOSITORY"])
 PREFIX = "BhagvadGita"  # Exact, case-sensitive title prefix
 MAX_AGE_HOURS = 36
 MIN_BYTES = 1_000_000
